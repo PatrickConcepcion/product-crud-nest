@@ -4,6 +4,9 @@ import { ProductsService } from './products.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { JwtService } from '@nestjs/jwt';
 import { BlacklistService } from '../auth/blacklist.service';
+import { PaginationDto } from './dto/pagination.dto';
+import { ValidationPipe, ArgumentMetadata, BadRequestException } from '@nestjs/common';
+import { CreateProductDto } from './dto/createProduct.dto';
 
 describe('ProductsController', () => {
   let controller: ProductsController;
@@ -56,7 +59,7 @@ describe('ProductsController', () => {
 
   it('getAll delegates to service', async () => {
     service.getAll.mockResolvedValue({ data: [] } as any);
-    const res = await controller.getAll({ page: 1, limit: 10 } as any);
+    const res = await controller.getAll({ page: 1, limit: 10 } as unknown as PaginationDto);
     expect(service.getAll).toHaveBeenCalledWith(1, 10);
     expect(res).toEqual({ data: [] });
   });
@@ -87,5 +90,12 @@ describe('ProductsController', () => {
     const res = await controller.deleteProduct(1 as any);
     expect(service.delete).toHaveBeenCalledWith(1);
     expect(res).toEqual({ id: 1 });
+  });
+
+  it('rejects negative price on create via ValidationPipe', async () => {
+    const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true });
+    const metadata: ArgumentMetadata = { type: 'body', metatype: CreateProductDto, data: '' };
+    await expect(pipe.transform({ name: 'prod', price: -5 }, metadata)).rejects.toBeInstanceOf(BadRequestException);
+    expect(service.create).not.toHaveBeenCalled();
   });
 });
