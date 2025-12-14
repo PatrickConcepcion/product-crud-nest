@@ -3,6 +3,7 @@ import { CreateProductDto } from './dto/createProduct.dto';
 import { UpdateProductDto } from './dto/updateProduct.dto';
 import { ProductsService } from './products.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { PaginationDto } from './dto/pagination.dto';
 
 @UseGuards(AuthGuard)
 @Controller('products')
@@ -11,8 +12,8 @@ export class ProductsController {
     constructor(private readonly productsService: ProductsService) {}
 
     @Get()
-    async getAll(@Query('page') page: number = 1, @Query('limit') limit: number = 10) {
-        return this.productsService.getAll(page, limit);
+    async getAll(@Query() query: PaginationDto) {
+        return this.productsService.getAll(query.page, query.limit);
     }
 
     @Post()
