@@ -1,18 +1,91 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductsController } from './products.controller';
+import { ProductsService } from './products.service';
+import { AuthGuard } from '../auth/auth.guard';
+import { JwtService } from '@nestjs/jwt';
+import { BlacklistService } from '../auth/blacklist.service';
 
 describe('ProductsController', () => {
   let controller: ProductsController;
+  let service: jest.Mocked<ProductsService>;
 
   beforeEach(async () => {
+    const serviceMock: Partial<jest.Mocked<ProductsService>> = {
+      getAll: jest.fn(),
+      create: jest.fn(),
+      getOne: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ProductsController],
+      providers: [
+        {
+          provide: ProductsService,
+          useValue: serviceMock,
+        },
+        {
+          provide: AuthGuard,
+          useValue: { canActivate: jest.fn().mockReturnValue(true) },
+        },
+        {
+          provide: JwtService,
+          useValue: {
+            sign: jest.fn(),
+            verifyAsync: jest.fn(),
+          },
+        },
+        {
+          provide: BlacklistService,
+          useValue: {
+            isRevoked: jest.fn(),
+            revoke: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     controller = module.get<ProductsController>(ProductsController);
+    service = module.get<ProductsService>(ProductsService) as jest.Mocked<ProductsService>;
   });
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('getAll delegates to service', async () => {
+    service.getAll.mockResolvedValue({ data: [] } as any);
+    const res = await controller.getAll({ page: 1, limit: 10 } as any);
+    expect(service.getAll).toHaveBeenCalledWith(1, 10);
+    expect(res).toEqual({ data: [] });
+  });
+
+  it('createProduct delegates to service', async () => {
+    service.create.mockResolvedValue({ id: 1 } as any);
+    const res = await controller.createProduct({ name: 'n', price: 1 } as any);
+    expect(service.create).toHaveBeenCalledWith('n', 1, undefined);
+    expect(res).toEqual({ id: 1 });
+  });
+
+  it('getProduct delegates to service', async () => {
+    service.getOne.mockResolvedValue({ id: 1 } as any);
+    const res = await controller.getProduct(1 as any);
+    expect(service.getOne).toHaveBeenCalledWith(1);
+    expect(res).toEqual({ id: 1 });
+  });
+
+  it('updateProduct delegates to service', async () => {
+    service.update.mockResolvedValue({ id: 1 } as any);
+    const res = await controller.updateProduct(1 as any, { name: 'n', price: 2 } as any);
+    expect(service.update).toHaveBeenCalledWith(1, 'n', 2, undefined);
+    expect(res).toEqual({ id: 1 });
+  });
+
+  it('deleteProduct delegates to service', async () => {
+    service.delete.mockResolvedValue({ id: 1 } as any);
+    const res = await controller.deleteProduct(1 as any);
+    expect(service.delete).toHaveBeenCalledWith(1);
+    expect(res).toEqual({ id: 1 });
   });
 });
