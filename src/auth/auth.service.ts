@@ -29,6 +29,8 @@ export class AuthService {
         }
 
         registrant.email = registrant.email.trim().toLowerCase();
+        registrant.firstName = registrant.firstName.trim();
+        registrant.lastName = registrant.lastName.trim();
 
         const exists = await this.usersService.findByEmail(registrant.email);
         
@@ -39,7 +41,12 @@ export class AuthService {
         registrant.password = registrant.password.trim();
         registrant.password = await bcrypt.hash(registrant.password, 10);
 
-        const data = await this.usersService.create(registrant.email, registrant.password);
+        const data = await this.usersService.create(
+            registrant.email,
+            registrant.password,
+            registrant.firstName,
+            registrant.lastName,
+        );
 
         if (!data) {
             throw new HttpException('Failed to register user', 500);
