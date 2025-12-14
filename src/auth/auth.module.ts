@@ -10,11 +10,13 @@ import { PrismaService } from '../prisma/prisma.service';
   imports: [
     UsersModule,
     JwtModule.register({
+      global: true,
       secret: process.env.JWT_SECRET || 'dev-secret',
       signOptions: { expiresIn: '1h' },
     }),
   ],
   controllers: [AuthController],
   providers: [AuthService, BlacklistService, PrismaService],
+  exports: [BlacklistService],
 })
 export class AuthModule {}
