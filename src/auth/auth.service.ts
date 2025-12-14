@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
@@ -34,8 +34,10 @@ export class AuthService {
 
         const exists = await this.usersService.findByEmail(registrant.email);
         
-        if (exists) {
-            throw new HttpException('User with this email already exists', 422);
+         if (exists) {
+            throw new BadRequestException({
+                email: ['User with this email already exists'],
+            });
         }
 
         registrant.password = registrant.password.trim();
@@ -60,13 +62,13 @@ export class AuthService {
         const existingUser = await this.usersService.findByEmail(user.email);
 
         if (!existingUser) {
-            throw new HttpException('Invalid email or password', 401);
+            throw new UnauthorizedException({ email: ['Invalid email or password']});
         }
 
         const passwordMatches = await bcrypt.compare(user.password, existingUser.password);
 
         if (!passwordMatches) {
-            throw new HttpException('Invalid email or password', 401);
+            throw new UnauthorizedException({ email: ['Invalid email or password']});
         }
         
         const accessPayload = { sub: existingUser.id, email: existingUser.email, jti: randomUUID() };
@@ -97,7 +99,7 @@ export class AuthService {
         let payload: any;
         try {
             payload = await this.jwtService.verifyAsync(token, {
-                secret: process.env.JWT_SECRET || 'dev-secret',
+                secret: process.env.JWT_SECRET,
                 ignoreExpiration: true,
             });
         } catch {
