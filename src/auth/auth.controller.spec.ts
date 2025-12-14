@@ -58,7 +58,7 @@ describe('AuthController', () => {
   it('register delegates to service', async () => {
     const response = { message: 'ok' } as Awaited<ReturnType<AuthService['register']>>;
     authService.register.mockResolvedValue(response);
-    const dto: RegisterDto = { email: '', password: '', confirmPassword: '' };
+    const dto: RegisterDto = { email: '', password: '', confirmPassword: '', firstName: '', lastName: '' };
     const res = await controller.register(dto);
     expect(authService.register).toHaveBeenCalled();
     expect(res).toEqual(response);

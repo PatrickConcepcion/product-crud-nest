@@ -40,20 +40,24 @@ describe('AuthService', () => {
       usersService.findByEmail.mockResolvedValue(null);
       usersService.create.mockResolvedValue({
         id: 1,
+        firstName: 'First',
+        lastName: 'Last',
         email: 'user@test.com',
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      } as Awaited<ReturnType<UsersService['create']>>);
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashedpw');
 
       const result = await authService.register({
         email: 'User@Test.com',
         password: 'secret123',
         confirmPassword: 'secret123',
+        firstName: 'First',
+        lastName: 'Last',
       });
 
       expect(usersService.findByEmail).toHaveBeenCalledWith('user@test.com');
-      expect(usersService.create).toHaveBeenCalledWith('user@test.com', 'hashedpw');
+      expect(usersService.create).toHaveBeenCalledWith('user@test.com', 'hashedpw', 'First', 'Last');
       expect(result.data).toMatchObject({ id: 1, email: 'user@test.com' });
     });
 
@@ -63,6 +67,8 @@ describe('AuthService', () => {
           email: 'user@test.com',
           password: 'one',
           confirmPassword: 'two',
+          firstName: 'First',
+          lastName: 'Last',
         }),
       ).rejects.toBeInstanceOf(HttpException);
     });
@@ -70,17 +76,21 @@ describe('AuthService', () => {
     it('throws when user already exists', async () => {
       usersService.findByEmail.mockResolvedValue({
         id: 1,
+        firstName: 'First',
+        lastName: 'Last',
         email: 'user@test.com',
         password: 'hashedpw',
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      } as Awaited<ReturnType<UsersService['findByEmail']>>);
 
       await expect(
         authService.register({
           email: 'user@test.com',
           password: 'secret123',
           confirmPassword: 'secret123',
+          firstName: 'First',
+          lastName: 'Last',
         }),
       ).rejects.toBeInstanceOf(HttpException);
     });
@@ -90,11 +100,13 @@ describe('AuthService', () => {
     it('returns access token on success', async () => {
       usersService.findByEmail.mockResolvedValue({
         id: 1,
+        firstName: 'First',
+        lastName: 'Last',
         email: 'user@test.com',
         password: 'hashed',
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      } as Awaited<ReturnType<UsersService['findByEmail']>>);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       jwtService.sign.mockReturnValue('token');
 
@@ -112,11 +124,13 @@ describe('AuthService', () => {
     it('throws on bad password', async () => {
       usersService.findByEmail.mockResolvedValue({
         id: 1,
+        firstName: 'First',
+        lastName: 'Last',
         email: 'user@test.com',
         password: 'hashed',
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      } as Awaited<ReturnType<UsersService['findByEmail']>>);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
       await expect(authService.login({ email: 'user@test.com', password: 'bad' })).rejects.toBeInstanceOf(HttpException);
     });
