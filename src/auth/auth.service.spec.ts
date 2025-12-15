@@ -20,6 +20,7 @@ describe('AuthService', () => {
     usersService = {
       findByEmail: jest.fn(),
       create: jest.fn(),
+      getProfile: jest.fn(),
     } as unknown as jest.Mocked<UsersService>;
 
     jwtService = {
@@ -113,7 +114,13 @@ describe('AuthService', () => {
       const res = await authService.login({ email: 'user@test.com', password: 'secret123' });
 
       expect(res.data.accessToken).toBe('token');
-      expect(jwtService.sign).toHaveBeenCalled();
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: 1,
+          email: 'user@test.com',
+        }),
+        expect.any(Object),
+      );
     });
 
     it('throws on unknown user', async () => {
