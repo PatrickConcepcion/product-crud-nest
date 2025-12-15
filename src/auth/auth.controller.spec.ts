@@ -6,10 +6,12 @@ import { JwtService } from '@nestjs/jwt';
 import { BlacklistService } from './blacklist.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UsersService } from '../users/users.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: jest.Mocked<AuthService>;
+  let usersService: jest.Mocked<UsersService>;
 
   beforeEach(async () => {
     const authServiceMock: Partial<jest.Mocked<AuthService>> = {
@@ -18,6 +20,9 @@ describe('AuthController', () => {
       refresh: jest.fn(),
       logout: jest.fn(),
     };
+    const usersServiceMock: Partial<jest.Mocked<UsersService>> = {
+      getProfile: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -25,6 +30,10 @@ describe('AuthController', () => {
         {
           provide: AuthService,
           useValue: authServiceMock,
+        },
+        {
+          provide: UsersService,
+          useValue: usersServiceMock,
         },
         {
           provide: AuthGuard,
@@ -49,6 +58,7 @@ describe('AuthController', () => {
 
     controller = module.get<AuthController>(AuthController);
     authService = module.get<AuthService>(AuthService) as jest.Mocked<AuthService>;
+    usersService = module.get<UsersService>(UsersService) as jest.Mocked<UsersService>;
   });
 
   it('should be defined', () => {
@@ -89,5 +99,13 @@ describe('AuthController', () => {
     const res = await controller.logout(req);
     expect(authService.logout).toHaveBeenCalledWith({ sub: 1 });
     expect(res).toEqual(response);
+  });
+
+  it('me returns profile from authService', async () => {
+    const profile = { id: 1, firstName: 'First', lastName: 'Last', email: 'a@test.com' };
+    authService.me = jest.fn().mockResolvedValue(profile);
+    const res = await controller.me({ user: { sub: 1 } } as any);
+    expect(authService.me).toHaveBeenCalledWith(1);
+    expect(res).toEqual({ user: profile });
   });
 });

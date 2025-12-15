@@ -71,13 +71,21 @@ export class AuthService {
             throw new UnauthorizedException({ email: ['Invalid email or password']});
         }
         
-        const accessPayload = { sub: existingUser.id, email: existingUser.email, jti: randomUUID() };
+        const accessPayload = {
+            sub: existingUser.id,
+            email: existingUser.email,
+            jti: randomUUID(),
+        };
         const accessToken = this.jwtService.sign(accessPayload, { expiresIn: '15m' });
 
         return {
             message: 'Login successful',
             data: { accessToken }
         }
+    }
+
+    async me(userId: number) {
+        return this.usersService.getProfile(userId);
     }
 
     async logout(payload: any) {
@@ -134,7 +142,11 @@ export class AuthService {
             await this.blacklistService.revoke(payload.jti, remainingWindow);
         }
 
-        const accessPayload = { sub: payload.sub, email: payload.email, jti: randomUUID() };
+        const accessPayload = {
+            sub: payload.sub,
+            email: payload.email,
+            jti: randomUUID(),
+        };
         const accessToken = this.jwtService.sign(accessPayload, { expiresIn: '15m' });
 
         return {

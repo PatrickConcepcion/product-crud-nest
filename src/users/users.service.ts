@@ -29,4 +29,15 @@ export class UsersService {
             where: { email }
         });
     }
+
+    async getProfile(id: number) {
+        return this.prisma.user.findUnique({
+            where: { id },
+            select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+            },
+        });
+    }
 }

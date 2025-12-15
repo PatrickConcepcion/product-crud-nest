@@ -33,6 +33,7 @@ export class AuthController {
     @UseGuards(AuthGuard)
     @Get('me')
     async me(@Req() req) {
-        return { user: req.user };
+        const user = await this.authService.me(req.user.sub);
+        return { user };
     }
 }
