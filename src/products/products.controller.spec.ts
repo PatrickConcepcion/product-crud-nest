@@ -68,28 +68,28 @@ describe('ProductsController', () => {
     service.create.mockResolvedValue({ id: 1 } as any);
     const res = await controller.createProduct({ name: 'n', price: 1 } as any);
     expect(service.create).toHaveBeenCalledWith('n', 1, undefined);
-    expect(res).toEqual({ id: 1 });
+    expect(res).toEqual({ message: 'Product created successfully', data: { id: 1 } });
   });
 
   it('getProduct delegates to service', async () => {
     service.getOne.mockResolvedValue({ id: 1 } as any);
     const res = await controller.getProduct(1 as any);
     expect(service.getOne).toHaveBeenCalledWith(1);
-    expect(res).toEqual({ id: 1 });
+    expect(res).toEqual({ data: { id: 1 } });
   });
 
   it('updateProduct delegates to service', async () => {
     service.update.mockResolvedValue({ id: 1 } as any);
     const res = await controller.updateProduct(1 as any, { name: 'n', price: 2 } as any);
     expect(service.update).toHaveBeenCalledWith(1, 'n', 2, undefined);
-    expect(res).toEqual({ id: 1 });
+    expect(res).toEqual({ message: 'Product updated successfully', data: { id: 1 } });
   });
 
   it('deleteProduct delegates to service', async () => {
     service.delete.mockResolvedValue({ id: 1 } as any);
     const res = await controller.deleteProduct(1 as any);
     expect(service.delete).toHaveBeenCalledWith(1);
-    expect(res).toEqual({ id: 1 });
+    expect(res).toEqual({ message: 'Product deleted successfully', data: { id: 1 } });
   });
 
   it('rejects negative price on create via ValidationPipe', async () => {
