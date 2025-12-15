@@ -32,7 +32,7 @@ async function bootstrap() {
     origin: ['http://localhost:5173'],
     credentials: true,
     methods: ['*'],
-    allowedHeaders: ['*'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
   await app.listen(process.env.PORT ?? 3005);
 }
