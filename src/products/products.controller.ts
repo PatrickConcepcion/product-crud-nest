@@ -18,21 +18,25 @@ export class ProductsController {
 
     @Post()
     async createProduct(@Body() productDto: CreateProductDto) {
-        return this.productsService.create(productDto.name, productDto.price, productDto.description);
+        const product = await this.productsService.create(productDto.name, productDto.price, productDto.description);
+        return { message: 'Product created successfully', data: product };
     }
 
     @Get(':id')
     async getProduct(@Param('id') id: number) {
-        return this.productsService.getOne(id);
+        const product = await this.productsService.getOne(id);
+        return { data: product };
     }
 
     @Put(':id')
     async updateProduct(@Param('id') id: number, @Body() productDto: UpdateProductDto) {
-        return this.productsService.update(id, productDto.name, productDto.price, productDto.description);
+        const product = await this.productsService.update(id, productDto.name, productDto.price, productDto.description);
+        return { message: 'Product updated successfully', data: product };
     }
 
     @Delete(':id')
     async deleteProduct(@Param('id') id: number) {
-        return this.productsService.delete(id);
+        const product = await this.productsService.delete(id);
+        return { message: 'Product deleted successfully', data: product };
     }
 }
