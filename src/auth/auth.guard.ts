@@ -26,7 +26,7 @@ export class AuthGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync(
         token,
         {
-          secret: process.env.JWT_SECRET || 'dev-secret',
+          secret: process.env.JWT_SECRET
         }
       );
       const revoked = await this.blacklistService.isRevoked(payload?.jti);
