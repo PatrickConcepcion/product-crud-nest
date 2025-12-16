@@ -7,6 +7,7 @@ import { BlacklistService } from './blacklist.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UsersService } from '../users/users.service';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -25,6 +26,15 @@ describe('AuthController', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
+      imports: [
+        ThrottlerModule.forRoot([
+          {
+            name: 'default',
+            ttl: 60000,
+            limit: 60,
+          },
+        ]),
+      ],
       controllers: [AuthController],
       providers: [
         {
