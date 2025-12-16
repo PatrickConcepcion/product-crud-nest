@@ -109,11 +109,12 @@ describe('AuthService', () => {
         updatedAt: new Date(),
       } as Awaited<ReturnType<UsersService['findByEmail']>>);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      jwtService.sign.mockReturnValue('token');
+      jwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
 
       const res = await authService.login({ email: 'user@test.com', password: 'secret123' });
 
-      expect(res.data.accessToken).toBe('token');
+      expect(res.data.accessToken).toBe('access-token');
+      expect(res.data.refreshToken).toBe('refresh-token');
       expect(jwtService.sign).toHaveBeenCalledWith(
         expect.objectContaining({
           sub: 1,
@@ -144,48 +145,52 @@ describe('AuthService', () => {
   });
 
   describe('refresh', () => {
-    const basePayload = { sub: 1, email: 'user@test.com', jti: 'old', iat: Math.floor(Date.now() / 1000) };
+    const exp = Math.floor(Date.now() / 1000) + 60;
+    const basePayload = { sub: 1, email: 'user@test.com', jti: 'old', exp, tokenType: 'refresh' };
 
-    it('issues new token within refresh window', async () => {
+    it('issues new tokens when refresh token is valid', async () => {
       jwtService.verifyAsync.mockResolvedValue(basePayload as any);
       blacklistService.isRevoked.mockResolvedValue(false);
-      jwtService.sign.mockReturnValue('new-token');
+      jwtService.sign.mockReturnValueOnce('new-access').mockReturnValueOnce('new-refresh');
 
-      const res = await authService.refresh('Bearer oldtoken');
+      const res = await authService.refresh('refresh-token');
 
-      expect(res.data.accessToken).toBe('new-token');
-      expect(blacklistService.revoke).toHaveBeenCalled();
+      expect(res.data.accessToken).toBe('new-access');
+      expect(res.data.refreshToken).toBe('new-refresh');
+      expect(blacklistService.revoke).toHaveBeenCalledWith('old', expect.any(Number));
     });
 
     it('rejects revoked token', async () => {
       jwtService.verifyAsync.mockResolvedValue(basePayload as any);
       blacklistService.isRevoked.mockResolvedValue(true);
 
-      await expect(authService.refresh('Bearer oldtoken')).rejects.toBeInstanceOf(HttpException);
+      await expect(authService.refresh('refresh-token')).rejects.toBeInstanceOf(HttpException);
     });
 
     it('rejects when token missing', async () => {
       await expect(authService.refresh(undefined)).rejects.toBeInstanceOf(HttpException);
-    });
-
-    it('rejects when beyond refresh window', async () => {
-      const oldPayload = { ...basePayload, iat: Math.floor(Date.now() / 1000) - 8 * 24 * 60 * 60 };
-      jwtService.verifyAsync.mockResolvedValue(oldPayload as any);
-      blacklistService.isRevoked.mockResolvedValue(false);
-
-      await expect(authService.refresh('Bearer oldtoken')).rejects.toBeInstanceOf(HttpException);
     });
   });
 
   describe('logout', () => {
     it('blacklists current token', async () => {
       const exp = Math.floor(Date.now() / 1000) + 60;
-      await authService.logout({ jti: 'jti', exp });
-      expect(blacklistService.revoke).toHaveBeenCalled();
+      await authService.logout({ jti: 'jti', exp, tokenType: 'access' });
+      expect(blacklistService.revoke).toHaveBeenCalledWith('jti', expect.any(Number));
     });
 
     it('throws when payload missing jti', async () => {
       await expect(authService.logout({})).rejects.toBeInstanceOf(HttpException);
+    });
+
+    it('also blacklists refresh token when provided', async () => {
+      const exp = Math.floor(Date.now() / 1000) + 60;
+      jwtService.verifyAsync.mockResolvedValue({ jti: 'refresh-jti', exp, tokenType: 'refresh' } as any);
+
+      await authService.logout({ jti: 'access-jti', exp, tokenType: 'access' }, 'refresh-token');
+
+      expect(blacklistService.revoke).toHaveBeenCalledWith('access-jti', expect.any(Number));
+      expect(blacklistService.revoke).toHaveBeenCalledWith('refresh-jti', expect.any(Number));
     });
   });
 });

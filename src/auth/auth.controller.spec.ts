@@ -75,29 +75,45 @@ describe('AuthController', () => {
   });
 
   it('login delegates to service', async () => {
-    const response = { message: 'ok' } as Awaited<ReturnType<AuthService['login']>>;
-    authService.login.mockResolvedValue(response);
+    authService.login.mockResolvedValue({
+      message: 'ok',
+      data: { accessToken: 'access', refreshToken: 'refresh' },
+    } as Awaited<ReturnType<AuthService['login']>>);
     const dto: LoginDto = { email: '', password: '' };
-    const res = await controller.login(dto);
+    const resMock = { cookie: jest.fn() } as any;
+    const res = await controller.login(dto, resMock);
     expect(authService.login).toHaveBeenCalled();
-    expect(res).toEqual(response);
+    expect(resMock.cookie).toHaveBeenCalledWith('access_token', 'access', expect.any(Object));
+    expect(resMock.cookie).toHaveBeenCalledWith('refresh_token', 'refresh', expect.any(Object));
+    expect(res).toEqual({ message: 'ok' });
   });
 
   it('refresh delegates to service', async () => {
-    const response = { message: 'ok' } as Awaited<ReturnType<AuthService['refresh']>>;
-    authService.refresh.mockResolvedValue(response);
-    const req: { headers: { authorization: string } } = { headers: { authorization: 'Bearer token' } };
-    const res = await controller.refresh(req);
-    expect(authService.refresh).toHaveBeenCalledWith('Bearer token');
-    expect(res).toEqual(response);
+    authService.refresh.mockResolvedValue({
+      message: 'ok',
+      data: { accessToken: 'new-access', refreshToken: 'new-refresh' },
+    } as Awaited<ReturnType<AuthService['refresh']>>);
+    const req: { headers: { cookie: string } } = { headers: { cookie: 'refresh_token=refresh' } };
+    const resMock = { cookie: jest.fn() } as any;
+    const res = await controller.refresh(req as any, resMock);
+    expect(authService.refresh).toHaveBeenCalledWith('refresh');
+    expect(resMock.cookie).toHaveBeenCalledWith('access_token', 'new-access', expect.any(Object));
+    expect(resMock.cookie).toHaveBeenCalledWith('refresh_token', 'new-refresh', expect.any(Object));
+    expect(res).toEqual({ message: 'ok' });
   });
 
   it('logout delegates to service', async () => {
     const response = { message: 'ok' } as Awaited<ReturnType<AuthService['logout']>>;
     authService.logout.mockResolvedValue(response);
-    const req: { user: { sub: number } } = { user: { sub: 1 } };
-    const res = await controller.logout(req);
-    expect(authService.logout).toHaveBeenCalledWith({ sub: 1 });
+    const req: { user: { sub: number }; headers: { cookie: string } } = {
+      user: { sub: 1 },
+      headers: { cookie: 'refresh_token=refresh' },
+    };
+    const resMock = { clearCookie: jest.fn() } as any;
+    const res = await controller.logout(req as any, resMock);
+    expect(authService.logout).toHaveBeenCalledWith({ sub: 1 }, 'refresh');
+    expect(resMock.clearCookie).toHaveBeenCalledWith('access_token', expect.any(Object));
+    expect(resMock.clearCookie).toHaveBeenCalledWith('refresh_token', expect.any(Object));
     expect(res).toEqual(response);
   });
 
