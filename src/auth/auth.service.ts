@@ -8,7 +8,8 @@ import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'crypto';
 import { BlacklistService } from './blacklist.service';
 
-const REFRESH_WINDOW_SECONDS = 7 * 24 * 60 * 60; // 7 days
+const ACCESS_TOKEN_EXPIRES_IN = '15m';
+const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +19,28 @@ export class AuthService {
         private jwtService: JwtService,
         private blacklistService: BlacklistService,
     ) {}
+
+    private issueAccessToken(user: { id: number; email: string }) {
+        const accessPayload = {
+            sub: user.id,
+            email: user.email,
+            jti: randomUUID(),
+            tokenType: 'access',
+        };
+        const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
+        return { accessToken, accessPayload };
+    }
+
+    private issueRefreshToken(user: { id: number; email: string }) {
+        const refreshPayload = {
+            sub: user.id,
+            email: user.email,
+            jti: randomUUID(),
+            tokenType: 'refresh',
+        };
+        const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+        return { refreshToken, refreshPayload };
+    }
 
     async register(registrant: RegisterDto) {
         if (!registrant) {
@@ -70,17 +93,12 @@ export class AuthService {
         if (!passwordMatches) {
             throw new UnauthorizedException({ email: ['Invalid email or password']});
         }
-        
-        const accessPayload = {
-            sub: existingUser.id,
-            email: existingUser.email,
-            jti: randomUUID(),
-        };
-        const accessToken = this.jwtService.sign(accessPayload, { expiresIn: '15m' });
+        const { accessToken } = this.issueAccessToken({ id: existingUser.id, email: existingUser.email });
+        const { refreshToken } = this.issueRefreshToken({ id: existingUser.id, email: existingUser.email });
 
         return {
             message: 'Login successful',
-            data: { accessToken }
+            data: { accessToken, refreshToken }
         }
     }
 
@@ -88,70 +106,62 @@ export class AuthService {
         return this.usersService.getProfile(userId);
     }
 
-    async logout(payload: any) {
-        if (!payload?.jti) {
+    private async revokeTokenJti(jti: string | undefined, exp: number | undefined) {
+        if (!jti || !exp) return;
+        const now = Math.floor(Date.now() / 1000);
+        const ttl = Math.max(0, exp - now);
+        await this.blacklistService.revoke(jti, ttl);
+    }
+
+    async logout(accessPayload: any, refreshToken?: string) {
+        if (!accessPayload?.jti || accessPayload?.tokenType !== 'access') {
             throw new HttpException('Invalid token', 401);
         }
-        const now = Math.floor(Date.now() / 1000);
-        const ttl = Math.max(0, (payload.exp ?? now) - now);
-        await this.blacklistService.revoke(payload.jti, ttl);
+
+        await this.revokeTokenJti(accessPayload.jti, accessPayload.exp);
+
+        if (refreshToken) {
+            try {
+                const refreshPayload: any = await this.jwtService.verifyAsync(refreshToken, {
+                    secret: process.env.JWT_SECRET,
+                });
+                if (refreshPayload?.tokenType === 'refresh') {
+                    await this.revokeTokenJti(refreshPayload.jti, refreshPayload.exp);
+                }
+            } catch {
+                // Ignore invalid refresh token during logout
+            }
+        }
+
         return { message: 'Logout successful' };
     }
 
-    async refresh(authHeader?: string) {
-        const token = authHeader?.split(' ')[1];
-        if (!token) {
-            throw new HttpException('Missing token', 401);
-        }
+    async refresh(refreshToken?: string) {
+        if (!refreshToken) throw new HttpException('Missing refresh token', 401);
 
         let payload: any;
         try {
-            payload = await this.jwtService.verifyAsync(token, {
+            payload = await this.jwtService.verifyAsync(refreshToken, {
                 secret: process.env.JWT_SECRET,
-                ignoreExpiration: true,
             });
         } catch {
-            throw new HttpException('Invalid token', 401);
+            throw new HttpException('Invalid refresh token', 401);
         }
 
-        if (!payload?.sub) {
-            throw new HttpException('Invalid token payload', 401);
-        }
+        if (!payload?.sub || payload?.tokenType !== 'refresh') throw new HttpException('Invalid refresh token', 401);
 
-        const now = Math.floor(Date.now() / 1000);
-        const issuedAt = payload.iat ?? payload.exp; // fallback if iat is missing
-        if (!issuedAt) {
-            throw new HttpException('Invalid token payload', 401);
-        }
-
-        const ageSeconds = now - issuedAt;
-        if (ageSeconds > REFRESH_WINDOW_SECONDS) {
-            throw new HttpException('Refresh window expired', 401);
-        }
-
-        const remainingWindow = Math.max(1, REFRESH_WINDOW_SECONDS - ageSeconds);
-
-        // Reject if blacklisted
         const revoked = await this.blacklistService.isRevoked(payload.jti);
-        if (revoked) {
-            throw new HttpException('Token revoked', 401);
-        }
+        if (revoked) throw new HttpException('Token revoked', 401);
 
-        // If the token isn't expired yet, blacklist it to prevent reuse after refresh
-        if (payload?.jti) {
-            await this.blacklistService.revoke(payload.jti, remainingWindow);
-        }
+        // Rotate refresh token: revoke the old one for the remainder of its lifetime
+        await this.revokeTokenJti(payload.jti, payload.exp);
 
-        const accessPayload = {
-            sub: payload.sub,
-            email: payload.email,
-            jti: randomUUID(),
-        };
-        const accessToken = this.jwtService.sign(accessPayload, { expiresIn: '15m' });
+        const { accessToken } = this.issueAccessToken({ id: payload.sub, email: payload.email });
+        const { refreshToken: nextRefreshToken } = this.issueRefreshToken({ id: payload.sub, email: payload.email });
 
         return {
             message: 'Tokens refreshed',
-            data: { accessToken },
+            data: { accessToken, refreshToken: nextRefreshToken },
         };
     }
 }

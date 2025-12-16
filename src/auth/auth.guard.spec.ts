@@ -36,7 +36,7 @@ describe('AuthGuard', () => {
 
   it('throws when token is revoked', async () => {
     const ctx = makeContext({ headers: { authorization: 'Bearer token' } });
-    jwtService.verifyAsync.mockResolvedValue({ jti: 'jti', sub: 1 });
+    jwtService.verifyAsync.mockResolvedValue({ jti: 'jti', sub: 1, tokenType: 'access' });
     blacklistService.isRevoked.mockResolvedValue(true);
 
     await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
@@ -47,13 +47,27 @@ describe('AuthGuard', () => {
       headers: { authorization: 'Bearer token' },
     };
     const ctx = makeContext(req);
-    jwtService.verifyAsync.mockResolvedValue({ jti: 'jti', sub: 1 });
+    jwtService.verifyAsync.mockResolvedValue({ jti: 'jti', sub: 1, tokenType: 'access' });
     blacklistService.isRevoked.mockResolvedValue(false);
 
     const result = await guard.canActivate(ctx);
 
     expect(result).toBe(true);
-    expect(req.user).toEqual({ jti: 'jti', sub: 1 });
+    expect(req.user).toEqual({ jti: 'jti', sub: 1, tokenType: 'access' });
     expect(req.token).toBe('token');
+  });
+
+  it('reads token from access_token cookie', async () => {
+    const req: { headers: Record<string, string>; user?: unknown; token?: string } = {
+      headers: { cookie: 'access_token=cookie-token' },
+    };
+    const ctx = makeContext(req);
+    jwtService.verifyAsync.mockResolvedValue({ jti: 'jti', sub: 1, tokenType: 'access' });
+    blacklistService.isRevoked.mockResolvedValue(false);
+
+    const result = await guard.canActivate(ctx);
+
+    expect(result).toBe(true);
+    expect(req.token).toBe('cookie-token');
   });
 });
